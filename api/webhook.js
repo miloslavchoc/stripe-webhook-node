@@ -1,29 +1,34 @@
 import Stripe from "stripe";
+import getRawBody from "raw-body";
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
-    return res.status(405).send("Method Not Allowed");
+    res.setHeader("Allow", "POST");
+    return res.status(405).end("Method Not Allowed");
   }
 
-  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
-  const sig = req.headers["stripe-signature"];
-
   let event;
+
   try {
+    const rawBody = await getRawBody(req);
+    const signature = req.headers["stripe-signature"];
+
     event = stripe.webhooks.constructEvent(
-      req.body,
-      sig,
+      rawBody,
+      signature,
       process.env.STRIPE_WEBHOOK_SECRET
     );
   } catch (err) {
+    console.error("❌ Stripe signature error:", err.message);
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 
-  return res.json({ received: true, type: event.type });
-}
+  // zatím jen potvrzení
+  if (event.type === "checkout.session.completed") {
+    console.log("✅ checkout.session.completed received");
+  }
 
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-};
+  res.status(200).json({ received: true });
+}
