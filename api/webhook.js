@@ -10,31 +10,34 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
-    res.setHeader("Allow", "POST");
-    return res.status(405).end("Method Not Allowed");
+    res.status(405).send("Method Not Allowed");
+    return;
   }
 
   const sig = req.headers["stripe-signature"];
   if (!sig) {
-    return res.status(400).send("Missing stripe-signature");
+    res.status(400).send("Missing stripe-signature");
+    return;
   }
 
   const chunks = [];
   for await (const chunk of req) {
     chunks.push(chunk);
   }
-  const rawBody = Buffer.concat(chunks);
+  const body = Buffer.concat(chunks);
 
   let event;
   try {
     event = stripe.webhooks.constructEvent(
-      rawBody,
+      body,
       sig,
       process.env.STRIPE_WEBHOOK_SECRET
     );
   } catch (err) {
-    return res.status(400).send(`Invalid signature`);
+    res.status(400).send(`Invalid signature`);
+    return;
   }
 
-  return res.status(200).json({ received: true, type: event.type });
+  // ZATÍM JEN POTVRZENÍ
+  res.status(200).json({ received: true, type: event.type });
 }
