@@ -1,0 +1,8 @@
+{
+  "name": "stripe-webhook-node",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "stripe": "^14.25.0"
+  }
+}
