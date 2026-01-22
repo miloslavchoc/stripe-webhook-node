@@ -11,7 +11,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
 });
 
 export default async function handler(req, res) {
-  // Stripe webhook je VŽDY POST
+  // povolujeme jen POST
   if (req.method !== "POST") {
     return res.status(405).send("Method Not Allowed");
   }
@@ -21,6 +21,7 @@ export default async function handler(req, res) {
     return res.status(400).send("Missing Stripe signature");
   }
 
+  // načtení RAW body
   let rawBody;
   try {
     const chunks = [];
@@ -29,9 +30,10 @@ export default async function handler(req, res) {
     }
     rawBody = Buffer.concat(chunks);
   } catch {
-    return res.status(400).send("Unable to read request body");
+    return res.status(400).send("Cannot read request body");
   }
 
+  // ověření podpisu
   let event;
   try {
     event = stripe.webhooks.constructEvent(
@@ -40,13 +42,25 @@ export default async function handler(req, res) {
       process.env.STRIPE_WEBHOOK_SECRET
     );
   } catch (err) {
-    console.error("Stripe signature verification failed:", err.message);
+    console.error("Stripe signature error:", err.message);
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 
-  // ZATÍM NIC NEUKLÁDÁME – jen potvrzení
+  // ZPRACUJEME JEN checkout.session.completed
   if (event.type === "checkout.session.completed") {
-    // připraveno pro další krok
+    const session = event.data.object;
+
+    const data = {
+      stripe_customer_id: session.customer ?? null,
+      stripe_subscription_id: session.subscription ?? null,
+      email: session.customer_details?.email ?? null,
+      mode: session.mode,
+      payment_status: session.payment_status,
+      status: session.status,
+    };
+
+    // JEN LOG – žádný zápis, žádná DB
+    console.log("CHECKOUT SESSION DATA:", data);
   }
 
   return res.status(200).json({ received: true });
